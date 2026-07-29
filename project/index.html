@@ -1,9 +1,86 @@
-<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><base href="./"><title>容器照合アプリ v2.5</title><style>body{font-family:sans-serif;text-align:center;margin:10px}#barcodeInput{font-size:48px;width:90%;padding:12px;text-align:center}#preview{width:25%;margin-top:10px;opacity:.6}.resultMark{font-size:160px;font-weight:bold}input[type=file]{font-size:28px;width:90%;padding:12px}input[type=file]::-webkit-file-upload-button{font-size:28px;padding:16px 32px}</style><script src="./tf.min.js"></script><script src="./teachablemachine-image.min.js"></script></head><body><h1>容器照合</h1><p>①バーコード入力(11桁)</p><input id="barcodeInput"><p id="barcodeResult">未入力</p><hr><p>②容器撮影→写真を使用</p><input type="file" id="upload" accept="image/*" capture="environment"><br><img id="preview"><hr><div id="result">準備中...</div><script>
-let model;const input=barcodeInput;
-async function init(){try{model=await tmImage.load("./model.json","./metadata.json");result.innerHTML="✅ 準備OK";input.focus()}catch(e){result.innerHTML="❌ モデル読込失敗";console.error(e)}}init();
-const toHalfWidth=s=>s.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[^0-9]/g,"");
-function getContainerFromBarcode(c){switch(c.slice(-3)){case"007":return"尿コップ";case"091":return"BloodGus";case"518":return"PN2";default:return"不明";}}
-input.oninput=function(){let c=toHalfWidth(this.value);this.value=c;if(c.length===11){barcodeResult.innerHTML="<b>"+getContainerFromBarcode(c)+"</b>";this.blur();setTimeout(()=>this.focus(),50);}};
-upload.onchange=e=>{let f=e.target.files[0];if(!f)return;preview.onload=async()=>{let t=getContainerFromBarcode(toHalfWidth(input.value));if(t==="不明"){alert("バーコード入力してください");return;}let p=await model.predict(preview);let b=p.reduce((a,c)=>a.probability>c.probability?a:c);let ai=b.probability<0.65?"不明":b.className;let ok=t===ai;result.innerHTML="<div class='resultMark' style='color:"+(ok?"green":"red")+"'>"+(ok?"〇":"×")+"</div>バーコード："+t+" / AI："+ai;setTimeout(()=>{input.value="";barcodeResult.innerHTML="未入力";preview.src="";upload.value="";input.focus();},800)};preview.src=URL.createObjectURL(f);};
-if('serviceWorker'in navigator){navigator.serviceWorker.register('./service-worker.js').catch(console.error);}
-</script></body></html>
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<base href="./">
+<title>容器照合アプリ v2.5</title>
+<style>
+body{font-family:sans-serif;text-align:center;margin:10px}
+#barcodeInput{font-size:48px;width:90%;padding:12px;text-align:center}
+#preview{width:25%;margin-top:10px;opacity:.6}
+.resultMark{font-size:160px;font-weight:bold}
+input[type=file]{font-size:28px;width:90%;padding:12px}
+input[type=file]::-webkit-file-upload-button{font-size:28px;padding:16px 32px}
+</style>
+<script src="./tf.min.js"></script>
+<script src="./teachablemachine-image.min.js"></script>
+</head>
+<body>
+<h1>容器照合</h1>
+<p>①バーコード入力(11桁)</p>
+<input id="barcodeInput" autocomplete="off">
+<p id="barcodeResult">未入力</p><hr>
+<p>②容器撮影→写真を使用</p>
+<input type="file" id="upload" accept="image/*" capture="environment"><br>
+<img id="preview"><hr>
+<div id="result">モデル読込中...</div>
+<script>
+let model;
+const input=document.getElementById("barcodeInput");
+const barcodeResult=document.getElementById("barcodeResult");
+const upload=document.getElementById("upload");
+const preview=document.getElementById("preview");
+const result=document.getElementById("result");
+async function init(){
+ try{
+   model=await tmImage.load("./model.json","./metadata.json");
+   result.innerHTML="✅ 準備OK";
+   input.focus();
+ }catch(e){
+   result.innerHTML="❌ モデル読込失敗<br>"+e.message;
+   console.error(e);
+ }
+}
+init();
+const toHalf=s=>s.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0)).replace(/[^0-9]/g,"");
+function getContainerFromBarcode(c){
+ switch(c.slice(-3)){
+  case "007": return "尿コップ";
+  case "091": return "BloodGas";
+  case "518": return "PN2";
+  default:return "不明";
+ }}
+input.oninput=function(){
+ this.value=toHalf(this.value);
+ if(this.value.length===11){
+   barcodeResult.innerHTML="<b>"+getContainerFromBarcode(this.value)+"</b>";
+   this.blur(); setTimeout(()=>this.focus(),50);
+ }
+}
+upload.onchange=e=>{
+ const f=e.target.files[0]; if(!f) return;
+ const url=URL.createObjectURL(f);
+ preview.onload=async()=>{
+  try{
+   const t=getContainerFromBarcode(toHalf(input.value));
+   if(t==="不明"){alert("バーコード入力してください");URL.revokeObjectURL(url);return;}
+   const p=await model.predict(preview);
+   const b=p.reduce((a,c)=>a.probability>c.probability?a:c);
+   const ai=b.probability<0.65?"不明":b.className;
+   const ok=t===ai;
+   result.innerHTML="<div class='resultMark' style='color:"+(ok?"green":"red")+"'>"+(ok?"〇":"×")+"</div>バーコード："+t+" / AI："+ai;
+  }catch(err){
+   result.innerHTML="❌ 判定エラー<br>"+err.message;
+  }finally{
+   URL.revokeObjectURL(url);
+   setTimeout(()=>{
+    input.value="";barcodeResult.textContent="未入力";preview.removeAttribute("src");upload.value="";result.innerHTML="✅ 準備OK";input.focus();
+   },1500);
+  }
+ };
+ preview.src=url;
+};
+if("serviceWorker" in navigator){navigator.serviceWorker.register("./service-worker.js").catch(console.error);}
+</script>
+</body></html>
