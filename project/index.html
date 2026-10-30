@@ -47,7 +47,7 @@ const toHalf=s=>s.replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0x
 function getContainerFromBarcode(c){
  switch(c.slice(-3)){
   case "007": return "尿コップ";
-  case "091": return "BloodGas";
+  case "091": return "BloodGus";
   case "518": return "PN2";
   default:return "不明";
  }}
@@ -76,7 +76,7 @@ upload.onchange=e=>{
    URL.revokeObjectURL(url);
    setTimeout(()=>{
     input.value="";barcodeResult.textContent="未入力";preview.removeAttribute("src");upload.value="";result.innerHTML="✅ 準備OK";input.focus();
-   },1500);
+   },3000);
   }
  };
  preview.src=url;
